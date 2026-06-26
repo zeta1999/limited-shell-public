@@ -1,0 +1,18 @@
+# Build artifacts
+/target/
+**/*.rlib
+**/*.d
+**/CACHEDIR.TAG
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CodeGraph (already tracked)
+# .codegraph/ is intentionally tracked
+src/bin
+limited-core/src/bin
