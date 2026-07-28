@@ -117,14 +117,15 @@ impl<'a> Pipeline<'a> {
         }
     }
 
-    /// Run the full pipeline on source code.
-    ///
-    /// Executes in order:
-    /// 1. **Parse** — convert source to AST
-    /// 2. **Type-check** — validate declarations and statements
-    /// 3. **Schedule** — for each operation, plan machine assignments
-    /// 4. **Execute** — run statements with the execution engine
     pub fn run(&self, source: &str) -> Result<PipelineResult, PipelineError> {
+        self.run_with_transport(source, &crate::remote::NoopTransport)
+    }
+
+    pub fn run_with_transport(
+        &self,
+        source: &str,
+        remote: &dyn crate::remote::RemoteTransport,
+    ) -> Result<PipelineResult, PipelineError> {
         // Phase 1: Parse
         let (items, program) = self.parse(source)?;
 
@@ -135,7 +136,7 @@ impl<'a> Pipeline<'a> {
         let schedules = self.schedule_operations(&items)?;
 
         // Phase 4: Execute statements
-        let execution = self.execute_program(&program)?;
+        let execution = self.execute_program_with_transport(&program, remote)?;
 
         Ok(PipelineResult {
             items,
@@ -417,11 +418,16 @@ impl<'a> Pipeline<'a> {
         Ok(input)
     }
 
-    fn execute_program(&self, program: &ast::Program) -> Result<ExecutionContextState, PipelineError> {
-        let mut ctx = ExecutionContext::new(
+    fn execute_program_with_transport(
+        &self,
+        program: &ast::Program,
+        remote: &dyn crate::remote::RemoteTransport,
+    ) -> Result<ExecutionContextState, PipelineError> {
+        let mut ctx = ExecutionContext::with_transport(
             self.resource_registry,
             self.extent_engine,
             self.machine_registry,
+            remote,
         );
 
         for stmt in &program.statements {

@@ -112,7 +112,7 @@ Aliases are fully interchangeable with their base types.
 
 - Alphanumeric and underscore, must start with letter or underscore
 - Case-sensitive
-- Reserved words: `role`, `resource`, `device`, `machine`, `operation`, `service`, `function`, `can`, `cannot`, `grant`, `requires`, `allow`, `if`, `and`, `or`, `not`, `is`, `in`, `from`, `on`, `exec`, `transfer`, `read`, `write`, `let`, `mut`, `for`, `while`, `break`, `continue`, `return`, `optimize`, `costs`, `cost`, `extends`, `default`, `type`, `key`
+- Reserved words: `role`, `resource`, `device`, `machine`, `operation`, `service`, `function`, `can`, `cannot`, `grant`, `requires`, `allow`, `if`, `and`, `or`, `not`, `is`, `in`, `from`, `on`, `exec`, `batch`, `interactive`, `transfer`, `read`, `write`, `let`, `mut`, `for`, `while`, `break`, `continue`, `return`, `optimize`, `costs`, `cost`, `extends`, `default`, `type`, `key`
 
 ### 3.2 Comments
 
@@ -464,7 +464,7 @@ operation OpName { param1: Type1, param2: Type2 } {
 
 | Operation | Description |
 |-----------|-------------|
-| `exec Cmd args...` | Execute a shell command; inherits current role capabilities |
+| `exec [batch\|interactive] Cmd args...` | Execute a shell command; inherits current role capabilities. Omit mode or use `batch` (default) to capture stdout/stderr with no TTY. Use `interactive` for an opt-in PTY/TUI session (e.g. remote `mc`) when the transport supports it. |
 | `transfer src { machine m, location dest }` | Copy file to remote machine |
 | `read json input as var` | Read and parse JSON input into variable |
 | `write json output value` | Write value as JSON output |

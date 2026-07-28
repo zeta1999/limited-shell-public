@@ -15,6 +15,7 @@ pub mod execute;
 pub mod parser;
 pub mod pipeline;
 pub mod pretty;
+pub mod remote;
 pub mod resource;
 pub mod scheduler;
 pub mod ty;

@@ -112,6 +112,18 @@ pub trait RemoteTransport: Send + Sync {
         args: &[String],
     ) -> Result<String, RemoteError>;
 
+    /// Run a command in an interactive PTY session (SSH-style TUI passthrough).
+    ///
+    /// Invoked by `exec interactive Cmd` in the limited-shell DSL.
+    /// Default trait impl returns an error; real transports (e.g. simple-remote)
+    /// override to attach a local TTY and forward keys/resize.
+    fn exec_interactive(
+        &self,
+        machine: &str,
+        cmd: &str,
+        args: &[String],
+    ) -> Result<(), RemoteError>;
+
     /// Push a file from a local path to a remote machine.
     ///
     /// # Arguments

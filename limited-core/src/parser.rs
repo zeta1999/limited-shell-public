@@ -116,6 +116,8 @@ static KEYWORDS: &[&str] = &[
     "broadcast",
     "sum",
     "options",
+    "batch",
+    "interactive",
 ];
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
@@ -1335,6 +1337,16 @@ impl Parser {
         if self.is_kind(&TokenKind::Colon) {
             self.pos += 1;
         }
+        // Optional mode: `exec batch cmd` / `exec interactive cmd` (omit → batch)
+        let mode = if self.is_kw("batch") {
+            self.pos += 1;
+            ast::ExecMode::Batch
+        } else if self.is_kw("interactive") {
+            self.pos += 1;
+            ast::ExecMode::Interactive
+        } else {
+            ast::ExecMode::Batch
+        };
         // Accept both identifiers and keywords as command names
         let cmd = match self.cur().kind {
             TokenKind::Ident(ref name) => {
@@ -1380,7 +1392,7 @@ impl Parser {
                 }
             }
         }
-        Ok(ast::OperationStatement::ExecCommand { cmd, args })
+        Ok(ast::OperationStatement::ExecCommand { mode, cmd, args })
     }
 
     fn parse_transfer_stmt(&mut self) -> Result<ast::OperationStatement, ParseError> {
@@ -1540,8 +1552,8 @@ impl Parser {
             Ok(ast::FunctionStatement::OnMachine(self.expect_ident()?))
         } else if self.is_kw("exec") {
             match self.parse_exec_stmt()? {
-                ast::OperationStatement::ExecCommand { cmd, args } => {
-                    Ok(ast::FunctionStatement::ExecCommand { cmd, args })
+                ast::OperationStatement::ExecCommand { mode, cmd, args } => {
+                    Ok(ast::FunctionStatement::ExecCommand { mode, cmd, args })
                 }
                 other => Err(ParseError {
                     message: format!("unexpected operation statement: {:?}", other),
@@ -4231,5 +4243,76 @@ mod tests {
     fn test_parse_tasks_remote_write() {
         let result = parse("on servers { tasks { x <- 5 } }");
         assert!(result.is_ok(), "tasks_remote_write error: {:?}", result);
+    }
+
+    #[test]
+    fn test_parse_exec_mode_default_batch() {
+        let program = parse(
+            r#"operation browse() {
+    options {
+        exec ls {"-la"};
+    }
+}"#,
+        )
+        .expect("parse");
+        let op = match &program.items[0] {
+            ast::Item::Operation(o) => o,
+            _ => panic!("expected operation"),
+        };
+        let stmt = &op.options[0].body[0];
+        match stmt {
+            ast::OperationStatement::ExecCommand { mode, cmd, .. } => {
+                assert_eq!(*mode, ast::ExecMode::Batch);
+                assert_eq!(cmd.name, "ls");
+            }
+            other => panic!("expected ExecCommand, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_exec_mode_interactive() {
+        let program = parse(
+            r#"operation browse() {
+    options {
+        exec interactive mc;
+    }
+}"#,
+        )
+        .expect("parse");
+        let op = match &program.items[0] {
+            ast::Item::Operation(o) => o,
+            _ => panic!("expected operation"),
+        };
+        let stmt = &op.options[0].body[0];
+        match stmt {
+            ast::OperationStatement::ExecCommand { mode, cmd, .. } => {
+                assert_eq!(*mode, ast::ExecMode::Interactive);
+                assert_eq!(cmd.name, "mc");
+            }
+            other => panic!("expected ExecCommand, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_exec_mode_explicit_batch() {
+        let program = parse(
+            r#"operation browse() {
+    options {
+        exec batch echo {"hi"};
+    }
+}"#,
+        )
+        .expect("parse");
+        let op = match &program.items[0] {
+            ast::Item::Operation(o) => o,
+            _ => panic!("expected operation"),
+        };
+        match &op.options[0].body[0] {
+            ast::OperationStatement::ExecCommand { mode, cmd, .. } => {
+                assert_eq!(*mode, ast::ExecMode::Batch);
+                assert_eq!(cmd.name, "echo");
+            }
+            other => panic!("expected ExecCommand, got {other:?}"),
+        }
     }
 }

@@ -294,12 +294,17 @@ fn operation_stmt_pretty(stmt: &ast::OperationStatement) -> String {
             format!("    let {}{}\n", decl.name, decl_ty_pretty(decl))
         }
         ast::OperationStatement::OnMachine(m) => format!("    on {}\n", m),
-        ast::OperationStatement::ExecCommand { cmd, args } => {
-            format!(
-                "    exec {} {}\n",
-                cmd,
-                args.iter().map(expr_pretty).collect::<Vec<_>>().join(" ")
-            )
+        ast::OperationStatement::ExecCommand { mode, cmd, args } => {
+            let mode_s = match mode {
+                ast::ExecMode::Batch => "",
+                ast::ExecMode::Interactive => "interactive ",
+            };
+            let args_s = args.iter().map(expr_pretty).collect::<Vec<_>>().join(" ");
+            if args_s.is_empty() {
+                format!("    exec {mode_s}{cmd}\n")
+            } else {
+                format!("    exec {mode_s}{cmd} {args_s}\n")
+            }
         }
         ast::OperationStatement::Transfer {
             from,
@@ -391,12 +396,17 @@ fn function_stmt_pretty(stmt: &ast::FunctionStatement) -> String {
             format!("  let {}{}\n", decl.name, decl_ty_pretty(decl))
         }
         ast::FunctionStatement::OnMachine(m) => format!("  on {}\n", m),
-        ast::FunctionStatement::ExecCommand { cmd, args } => {
-            format!(
-                "  exec {} {}\n",
-                cmd,
-                args.iter().map(expr_pretty).collect::<Vec<_>>().join(" ")
-            )
+        ast::FunctionStatement::ExecCommand { mode, cmd, args } => {
+            let mode_s = match mode {
+                ast::ExecMode::Batch => "",
+                ast::ExecMode::Interactive => "interactive ",
+            };
+            let args_s = args.iter().map(expr_pretty).collect::<Vec<_>>().join(" ");
+            if args_s.is_empty() {
+                format!("  exec {mode_s}{cmd}\n")
+            } else {
+                format!("  exec {mode_s}{cmd} {args_s}\n")
+            }
         }
         ast::FunctionStatement::ReadJson { var } => format!("  read: {}\n", var),
         ast::FunctionStatement::WriteJson { value } => format!("  write {}\n", expr_pretty(value)),

@@ -32,6 +32,8 @@ pub struct ExecutionContext<'a> {
     extent_engine: &'a ExtentEngine,
     /// Machine registry for `on machine` lookups.
     machine_registry: &'a MachineRegistry,
+    /// Remote transport layer.
+    pub remote: &'a dyn crate::remote::RemoteTransport,
 }
 
 impl<'a> ExecutionContext<'a> {
@@ -46,6 +48,23 @@ impl<'a> ExecutionContext<'a> {
             registry,
             extent_engine,
             machine_registry,
+            remote: &crate::remote::NoopTransport,
+        }
+    }
+
+    pub fn with_transport(
+        registry: &'a ResourceRegistry,
+        extent_engine: &'a ExtentEngine,
+        machine_registry: &'a MachineRegistry,
+        remote: &'a dyn crate::remote::RemoteTransport,
+    ) -> Self {
+        Self {
+            scopes: vec![HashMap::new()],
+            current_machine: None,
+            registry,
+            extent_engine,
+            machine_registry,
+            remote,
         }
     }
 
@@ -540,6 +559,7 @@ pub enum ExecutionError {
     ChooseNotAllowedOutsideOperation,
     MachineNotFound(String),
     RequirementNotSatisfied,
+    Remote(crate::remote::RemoteError),
 }
 
 impl std::fmt::Display for ExecutionError {
@@ -563,6 +583,7 @@ impl std::fmt::Display for ExecutionError {
             }
             Self::MachineNotFound(n) => write!(f, "machine not found: {n}"),
             Self::RequirementNotSatisfied => write!(f, "requirement not satisfied"),
+            Self::Remote(err) => write!(f, "remote error: {err}"),
         }
     }
 }
@@ -821,12 +842,16 @@ fn execute_task_item(
                 .ok_or(ExecutionError::UndefinedVariable(variable.name.clone()))?;
             // machine_name is an Ident — look it up in context
             let machine = if let Some(v) = ctx.lookup(&machine_name.name) {
-                v.clone()
+                v.to_string()
             } else {
-                RuntimeValue::StringVal(machine_name.name.clone())
+                machine_name.name.clone()
             };
             let location = eval_expr(path, ctx)?;
-            let _ = (val, machine, location);
+            let location_str = location.to_string();
+
+            ctx.remote
+                .remote_write(&machine, &val, &location_str)
+                .map_err(ExecutionError::Remote)?;
         }
         ast::TaskItem::Optimize { metric: _ } => {
             // Optimization directive — affects scheduler, not runtime
@@ -908,13 +933,29 @@ pub fn execute_op_statement(
             ctx.set_machine(machine.name.clone());
             Ok(())
         }
-        ast::OperationStatement::ExecCommand { cmd, args } => {
-            let _args: Vec<RuntimeValue> = args
+        ast::OperationStatement::ExecCommand { mode, cmd, args } => {
+            let target = ctx.get_machine().unwrap_or("local");
+
+            let args_strs: Vec<String> = args
                 .iter()
-                .map(|a| eval_expr(a, ctx))
-                .collect::<Result<_, _>>()?;
-            let _ = cmd;
-            // Future: actually execute the command on the target machine
+                .map(|a| {
+                    let v = eval_expr(a, ctx)?;
+                    Ok(v.to_string())
+                })
+                .collect::<Result<Vec<String>, ExecutionError>>()?;
+
+            match mode {
+                ast::ExecMode::Batch => {
+                    ctx.remote
+                        .exec(target, &cmd.name, &args_strs)
+                        .map_err(ExecutionError::Remote)?;
+                }
+                ast::ExecMode::Interactive => {
+                    ctx.remote
+                        .exec_interactive(target, &cmd.name, &args_strs)
+                        .map_err(ExecutionError::Remote)?;
+                }
+            }
             Ok(())
         }
         ast::OperationStatement::Transfer {
@@ -922,15 +963,45 @@ pub fn execute_op_statement(
             machine,
             location,
         } => {
-            let _from = eval_expr(from, ctx)?;
-            let _machine = eval_expr(machine, ctx)?;
-            let _location = eval_expr(location, ctx)?;
-            // Future: perform the file transfer
+            let from_val = eval_expr(from, ctx)?;
+            let from_str = match &from_val {
+                RuntimeValue::StringVal(s) => s.clone(),
+                RuntimeValue::Resource(_, fields) => fields.get("location")
+                    .or_else(|| fields.get("path"))
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| from_val.to_string()),
+                _ => from_val.to_string(),
+            };
+
+            let machine_val = eval_expr(machine, ctx)?;
+            let target_machine = match &machine_val {
+                RuntimeValue::StringVal(s) => s.clone(),
+                RuntimeValue::Resource(_, fields) => fields.get("name")
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| machine_val.to_string()),
+                _ => machine_val.to_string(),
+            };
+
+            let location_val = eval_expr(location, ctx)?;
+            let location_str = location_val.to_string();
+
+            ctx.remote
+                .transfer(&target_machine, &from_str, &location_str)
+                .map_err(ExecutionError::Remote)?;
             Ok(())
         }
         ast::OperationStatement::ShellCmd { cmd, args } => {
-            let _ = (cmd, args);
-            // Future: execute shell command
+            let target = ctx.get_machine().unwrap_or("local");
+
+            let full_command = if args.is_empty() {
+                cmd.clone()
+            } else {
+                format!("{} {}", cmd, args.join(" "))
+            };
+
+            ctx.remote
+                .shell(target, &full_command)
+                .map_err(ExecutionError::Remote)?;
             Ok(())
         }
     }
@@ -980,28 +1051,54 @@ pub fn execute_function(
             Ok(None)
         }
         ast::FunctionStatement::SetEnv { name, secret } => {
-            let _ = secret;
-            // Future: store secret in environment
-            let _ = name;
+            let target = ctx.get_machine().unwrap_or("local");
+
+            ctx.remote
+                .set_env(target, &name.name, secret)
+                .map_err(ExecutionError::Remote)?;
             Ok(None)
         }
-        ast::FunctionStatement::ExecCommand { cmd, args } => {
-            let _args: Vec<RuntimeValue> = args
+        ast::FunctionStatement::ExecCommand { mode, cmd, args } => {
+            let target = ctx.get_machine().unwrap_or("local");
+
+            let args_strs: Vec<String> = args
                 .iter()
-                .map(|a| eval_expr(a, ctx))
-                .collect::<Result<_, _>>()?;
-            let _ = cmd;
+                .map(|a| {
+                    let v = eval_expr(a, ctx)?;
+                    Ok(v.to_string())
+                })
+                .collect::<Result<Vec<String>, ExecutionError>>()?;
+
+            match mode {
+                ast::ExecMode::Batch => {
+                    ctx.remote
+                        .exec(target, &cmd.name, &args_strs)
+                        .map_err(ExecutionError::Remote)?;
+                }
+                ast::ExecMode::Interactive => {
+                    ctx.remote
+                        .exec_interactive(target, &cmd.name, &args_strs)
+                        .map_err(ExecutionError::Remote)?;
+                }
+            }
             Ok(None)
         }
         ast::FunctionStatement::ReadJson { var } => {
-            // Future: read JSON from last exec command's stdout
-            let val = RuntimeValue::Struct(HashMap::new());
-            ctx.bind(var.name.clone(), val);
+            let target = ctx.get_machine().unwrap_or("local");
+            let path = format!("/tmp/{}.json", var.name);
+            let value = ctx.remote
+                .remote_read(target, &path)
+                .map_err(ExecutionError::Remote)?;
+            ctx.bind(var.name.clone(), value);
             Ok(None)
         }
         ast::FunctionStatement::WriteJson { value } => {
-            let _val = eval_expr(value, ctx)?;
-            // Future: write JSON to stdout
+            let target = ctx.get_machine().unwrap_or("local");
+            let resolved = eval_expr(value, ctx)?;
+            let path = format!("/tmp/output_{}.json", resolved.type_name().to_lowercase());
+            ctx.remote
+                .remote_write(target, &resolved, &path)
+                .map_err(ExecutionError::Remote)?;
             Ok(None)
         }
         ast::FunctionStatement::Transfer {
@@ -1009,9 +1106,31 @@ pub fn execute_function(
             machine,
             location,
         } => {
-            let _from = eval_expr(from, ctx)?;
-            let _machine = eval_expr(machine, ctx)?;
-            let _location = eval_expr(location, ctx)?;
+            let from_val = eval_expr(from, ctx)?;
+            let from_str = match &from_val {
+                RuntimeValue::StringVal(s) => s.clone(),
+                RuntimeValue::Resource(_, fields) => fields.get("location")
+                    .or_else(|| fields.get("path"))
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| from_val.to_string()),
+                _ => from_val.to_string(),
+            };
+
+            let machine_val = eval_expr(machine, ctx)?;
+            let target_machine = match &machine_val {
+                RuntimeValue::StringVal(s) => s.clone(),
+                RuntimeValue::Resource(_, fields) => fields.get("name")
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| machine_val.to_string()),
+                _ => machine_val.to_string(),
+            };
+
+            let location_val = eval_expr(location, ctx)?;
+            let location_str = location_val.to_string();
+
+            ctx.remote
+                .transfer(&target_machine, &from_str, &location_str)
+                .map_err(ExecutionError::Remote)?;
             Ok(None)
         }
         ast::FunctionStatement::Dependency {
@@ -2113,10 +2232,35 @@ mod tests {
     fn test_execute_op_exec_command() {
         let mut ctx = make_ctx();
         let stmt = ast::OperationStatement::ExecCommand {
+            mode: ast::ExecMode::Batch,
             cmd: ast::Ident { name: "deploy".into() },
             args: vec![Expr::Lit(Literal::StringVal("app".into()))],
         };
         assert!(execute_op_statement(&stmt, &mut ctx).is_ok());
+    }
+
+    #[test]
+    fn test_execute_op_exec_interactive_records_call() {
+        use crate::remote::{RecordedCall, TestTransport};
+
+        let reg = Box::leak(Box::new(ResourceRegistry::new()));
+        let ext = Box::leak(Box::new(ExtentEngine::new()));
+        let mach = Box::leak(Box::new(MachineRegistry::new()));
+        let transport = Box::leak(Box::new(TestTransport::new()));
+        let mut ctx = ExecutionContext::with_transport(reg, ext, mach, transport);
+
+        let stmt = ast::OperationStatement::ExecCommand {
+            mode: ast::ExecMode::Interactive,
+            cmd: ast::Ident { name: "mc".into() },
+            args: vec![],
+        };
+        assert!(execute_op_statement(&stmt, &mut ctx).is_ok());
+        let calls = transport.calls();
+        assert_eq!(calls.len(), 1);
+        match &calls[0] {
+            RecordedCall::ExecInteractive { cmd, .. } => assert_eq!(cmd, "mc"),
+            other => panic!("expected ExecInteractive, got {other:?}"),
+        }
     }
 
     #[test]
@@ -2284,6 +2428,7 @@ mod tests {
     fn test_execute_task_op_call_args() {
         let mut ctx = make_ctx();
         let stmt = ast::OperationStatement::ExecCommand {
+            mode: ast::ExecMode::Batch,
             cmd: ast::Ident { name: "test".into() },
             args: vec![Expr::Lit(Literal::StringVal("arg1".into()))],
         };

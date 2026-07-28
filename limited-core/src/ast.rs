@@ -254,6 +254,17 @@ pub struct OperationOption {
     pub body: Vec<OperationStatement>,
 }
 
+/// How a remote/local `exec` should run.
+///
+/// - [`ExecMode::Batch`] (default): capture stdout/stderr, no TTY.
+/// - [`ExecMode::Interactive`]: PTY session for full-screen TUI apps (e.g. `mc`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExecMode {
+    #[default]
+    Batch,
+    Interactive,
+}
+
 #[derive(Debug, Clone)]
 pub enum OperationStatement {
     Require(Condition),
@@ -261,6 +272,7 @@ pub enum OperationStatement {
     LetDecl(LetDecl),
     OnMachine(Ident),
     ExecCommand {
+        mode: ExecMode,
         cmd: Ident,
         args: Vec<Expr>,
     },
@@ -326,6 +338,7 @@ pub enum FunctionStatement {
         secret: SecretSource,
     },
     ExecCommand {
+        mode: ExecMode,
         cmd: Ident,
         args: Vec<Expr>,
     },

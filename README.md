@@ -46,6 +46,8 @@ lean/           Lean 4 models (role hierarchy, policy engine, ...)
 
 See [`DESIGN_REMOTE.md`](DESIGN_REMOTE.md) for the remote-execution layer that [`simple-remote`](https://github.com/zeta1999/simple-remote-public) builds on.
 
+Remote `exec` is **batch by default** (`exec cmd` / `exec batch cmd`). Opt in to a PTY/TUI session with `exec interactive cmd` when the transport supports it (e.g. controlling a remote `mc`).
+
 ## License
 
 MIT OR Apache-2.0

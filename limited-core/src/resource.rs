@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 // ─── Runtime value model ───────────────────────────────────────
 
 /// Runtime values for actual resource instances (as opposed to AST types).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RuntimeValue {
     Null,
     Bool(bool),
