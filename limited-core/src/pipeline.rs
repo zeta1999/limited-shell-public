@@ -147,18 +147,24 @@ impl<'a> Pipeline<'a> {
     }
 
     fn parse(&self, source: &str) -> Result<(Vec<ast::Item>, ast::Program), PipelineError> {
-        let ast::Program { items, statements } = parser::parse(source).map_err(|e| {
-            PipelineError::Parse {
+        let ast::Program { items, statements } =
+            parser::parse(source).map_err(|e| PipelineError::Parse {
                 phase: "parse".into(),
                 message: e.to_string(),
-            }
-        })?;
+            })?;
 
-        let program = ast::Program { items: vec![], statements };
+        let program = ast::Program {
+            items: vec![],
+            statements,
+        };
         Ok((items, program))
     }
 
-    fn type_check(&self, items: &[ast::Item], _program: &ast::Program) -> Result<(), PipelineError> {
+    fn type_check(
+        &self,
+        items: &[ast::Item],
+        _program: &ast::Program,
+    ) -> Result<(), PipelineError> {
         // Type-check all items (declarations)
         for item in items {
             self.type_check_item(item)?;
@@ -515,7 +521,9 @@ mod tests {
     fn test_parse_for_loop() {
         let pipeline = make_context();
         let result = pipeline.run("for m in machines() { on machine m; }");
-        if let Err(ref e) = result { eprintln!("PARSE ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("PARSE ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.program.statements.len(), 1);
@@ -535,7 +543,9 @@ operation deploy(Node x) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("OP ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("OP ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 1);
@@ -560,7 +570,9 @@ operation compute(Node target) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("OPCOST ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("OPCOST ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 1);
@@ -581,7 +593,9 @@ operation deploy(Node x) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("INF ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("INF ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.schedules.len(), 1);
@@ -595,16 +609,15 @@ operation deploy(Node x) {
         assert!(result.is_ok());
         let result = result.unwrap();
         // The execution should produce an ExecutionContextState
-        assert!(!result.execution.variables.is_empty()
-            || result.program.statements.len() == 1);
+        assert!(!result.execution.variables.is_empty() || result.program.statements.len() == 1);
     }
 
     // ─── Type Checking Tests ────────────────
 
     fn make_context_with_resource(name: &str) -> Pipeline<'static> {
-        let mut registry = ResourceRegistry::new();
-        let mut extent_engine = ExtentEngine::new();
-        let mut machine_registry = MachineRegistry::new();
+        let registry = ResourceRegistry::new();
+        let extent_engine = ExtentEngine::new();
+        let machine_registry = MachineRegistry::new();
         let mut type_registry = TypeRegistry::new();
         type_registry.register_resource(
             ast::Ident { name: name.into() },
@@ -630,7 +643,9 @@ operation deploy(Node x) {
         let pipeline = make_context_with_resource("Node");
         // Alias items don't end with semicolons
         let result = pipeline.run(r#"alias Node = Node"#);
-        if let Err(ref e) = result { eprintln!("ALIAS ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("ALIAS ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -644,7 +659,9 @@ resource Compute {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("TYPE CHECK RESOURCE ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("TYPE CHECK RESOURCE ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -688,7 +705,9 @@ service web(Node n) on n {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("SERVICE ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("SERVICE ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -719,7 +738,9 @@ operation deploy(Node target) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("FULL PIPELINE ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("FULL PIPELINE ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 3);
@@ -803,7 +824,9 @@ operation deploy(Node target) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("MULTI OPT ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("MULTI OPT ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 1);
@@ -821,7 +844,9 @@ function setup(Int count) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("FUNC ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("FUNC ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 1);
@@ -836,7 +861,9 @@ function setup(Int count) {
 try { tasks { foo } } catch error e { tasks { bar } }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("TRYCATCH ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("TRYCATCH ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -860,7 +887,9 @@ role Admin {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("ROLE ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("ROLE ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -875,7 +904,9 @@ role Admin {
     fn test_pipeline_type_check_alias() {
         let pipeline = make_context();
         let result = pipeline.run("alias m as machine = Node\nalias r as role = Admin");
-        if let Err(ref e) = result { eprintln!("ALIAS ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("ALIAS ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 2);
@@ -889,7 +920,9 @@ role Admin {
 alias m as machine = Node
 "#,
         );
-        if let Err(ref e) = result { eprintln!("MULTI ITEM ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("MULTI ITEM ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -907,7 +940,9 @@ operation deploy(Node target) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("SCHED ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("SCHED ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.schedules.len(), 1);
@@ -925,7 +960,9 @@ operation deploy(Node target) {
     fn test_pipeline_resource_decl_no_params() {
         let pipeline = make_context();
         let result = pipeline.run("resource Empty {}");
-        if let Err(ref e) = result { eprintln!("EMPTY ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("EMPTY ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 1);
@@ -936,7 +973,9 @@ operation deploy(Node target) {
         let pipeline = make_context();
         let result = pipeline.run("alias Node = Node\nalias Server = Node");
         // Two aliases both work
-        if let Err(ref e) = result { eprintln!("TM ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("TM ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 2);
@@ -951,7 +990,9 @@ alias m as machine = Node
 alias r as role = Admin
 "#,
         );
-        if let Err(ref e) = result { eprintln!("CHAIN ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("CHAIN ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 2);
@@ -969,7 +1010,9 @@ role Admin {
 alias m as machine = Node
 "#,
         );
-        if let Err(ref e) = result { eprintln!("COMPLEX ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("COMPLEX ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -1027,7 +1070,9 @@ resource Server {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("RESOURCE FIELD ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("RESOURCE FIELD ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.items.len(), 1);
@@ -1052,7 +1097,9 @@ operation teardown(Node target) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("MULTI OP ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("MULTI OP ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.schedules.len(), 2);
@@ -1072,7 +1119,9 @@ operation deploy(Node target) {
 "#,
         );
         // No machines registered, scheduling should still "work" (just no assignments)
-        if let Err(ref e) = result { eprintln!("NO MACHINE SCHED ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("NO MACHINE SCHED ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -1091,7 +1140,9 @@ operation compute(Node target) {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("COST ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("COST ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.schedules.len(), 1);
@@ -1107,7 +1158,9 @@ for m in machines() {
 }
 "#,
         );
-        if let Err(ref e) = result { eprintln!("FOR ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("FOR ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 
@@ -1115,7 +1168,9 @@ for m in machines() {
     fn test_pipeline_if_exec() {
         let pipeline = make_context();
         let result = pipeline.run("if 1 > 0 { on machine alpha; } else { on machine beta; }");
-        if let Err(ref e) = result { eprintln!("IF ERROR: {:?}", e); }
+        if let Err(ref e) = result {
+            eprintln!("IF ERROR: {:?}", e);
+        }
         assert!(result.is_ok());
     }
 }

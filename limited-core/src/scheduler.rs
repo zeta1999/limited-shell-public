@@ -307,7 +307,7 @@ impl CostScheduler {
         let machines = reg
             .list()
             .iter()
-            .filter_map(|name| reg.get(name).map(|m| MachineInfo::from_machine(m)))
+            .filter_map(|name| reg.get(name).map(MachineInfo::from_machine))
             .collect();
         Self { machines, metrics }
     }
@@ -507,6 +507,7 @@ mod tests {
     use crate::ast::expr::{Expr, Literal};
     use crate::resource::{ExtentPool, ExtentType};
 
+    #[allow(dead_code)]
     fn int_cost(value: u64) -> CostEntry {
         CostEntry {
             kind: ast::Ident { name: "RAM".into() },
@@ -514,6 +515,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     fn bytes_cost(value: u64, suffix: ast::BytesSuffix) -> CostEntry {
         CostEntry {
             kind: ast::Ident { name: "RAM".into() },
@@ -848,7 +850,10 @@ mod tests {
             name: "alpha".to_string(),
             extents: {
                 let mut h = HashMap::new();
-                h.insert("CPU".to_string(), ExtentPool::new("CPU", 100, ExtentType::Count));
+                h.insert(
+                    "CPU".to_string(),
+                    ExtentPool::new("CPU", 100, ExtentType::Count),
+                );
                 h
             },
             keys: vec![],
@@ -858,7 +863,10 @@ mod tests {
             name: "beta".to_string(),
             extents: {
                 let mut h = HashMap::new();
-                h.insert("CPU".to_string(), ExtentPool::new("CPU", 100, ExtentType::Count));
+                h.insert(
+                    "CPU".to_string(),
+                    ExtentPool::new("CPU", 100, ExtentType::Count),
+                );
                 h
             },
             keys: vec![],
@@ -878,7 +886,10 @@ mod tests {
         let result = schedule(input, &reg);
         assert!(result.plan.feasible);
         let machine = &result.plan.assignments[0].machine;
-        assert!(machine == "alpha" || machine == "beta", "unexpected machine: {machine}");
+        assert!(
+            machine == "alpha" || machine == "beta",
+            "unexpected machine: {machine}"
+        );
     }
 
     #[test]
@@ -905,9 +916,15 @@ mod tests {
 
     #[test]
     fn test_scheduler_error_all_display() {
-        assert!(SchedulerError::MachineNotFound("x".into()).to_string().contains("x"));
-        assert!(SchedulerError::UnresolvedCostVar("y".into()).to_string().contains("y"));
-        assert!(SchedulerError::ConstraintViolation("too expensive".into()).to_string().contains("too expensive"));
+        assert!(SchedulerError::MachineNotFound("x".into())
+            .to_string()
+            .contains("x"));
+        assert!(SchedulerError::UnresolvedCostVar("y".into())
+            .to_string()
+            .contains("y"));
+        assert!(SchedulerError::ConstraintViolation("too expensive".into())
+            .to_string()
+            .contains("too expensive"));
     }
 
     #[test]

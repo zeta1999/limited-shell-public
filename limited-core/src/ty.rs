@@ -1622,8 +1622,8 @@ mod tests {
 
     #[test]
     fn test_check_expr_binop_numeric_equality() {
-        let env = TyEnv::new();
-        let reg = TypeRegistry::new();
+        let _env = TyEnv::new();
+        let _reg = TypeRegistry::new();
         // Bytes is numeric, so comparison with Int should fail (different types)
         // but within numeric types, comparison is allowed
         let bytes_ty = ast::Type::Primitive(ast::PrimitiveType::Bytes);
@@ -2588,10 +2588,13 @@ mod tests {
         let mut env = TyEnv::new();
         env.bind(ident("s"), ast::Type::Resource(ident("Server")));
         let mut reg = TypeRegistry::new();
-        reg.register_resource(ident("Server"), ResourceTypeInfo {
-            fields: Vec::new(),
-            capacities: Vec::new(),
-        });
+        reg.register_resource(
+            ident("Server"),
+            ResourceTypeInfo {
+                fields: Vec::new(),
+                capacities: Vec::new(),
+            },
+        );
         let decl = LetDecl {
             name: ident("x"),
             ty: None,
@@ -2620,7 +2623,9 @@ mod tests {
         let mut env = TyEnv::new();
         env.bind(
             ident("matrix"),
-            ast::Type::List(Box::new(ast::Type::List(Box::new(ast::Type::Primitive(ast::PrimitiveType::Int))))),
+            ast::Type::List(Box::new(ast::Type::List(Box::new(ast::Type::Primitive(
+                ast::PrimitiveType::Int,
+            ))))),
         );
         let reg = TypeRegistry::new();
         let inner = Expr::IndexAccess {
@@ -2662,7 +2667,10 @@ mod tests {
             index: Box::new(Expr::Lit(Literal::Int(0))),
         };
         let result = check_expr(&env, &reg, &expr).unwrap();
-        assert!(matches!(result, ast::Type::Primitive(ast::PrimitiveType::Int)));
+        assert!(matches!(
+            result,
+            ast::Type::Primitive(ast::PrimitiveType::Int)
+        ));
     }
 
     #[test]
@@ -2699,7 +2707,10 @@ mod tests {
             index: Box::new(Expr::Lit(Literal::Int(0))),
         };
         let result = check_expr(&env, &reg, &expr).unwrap();
-        assert!(matches!(result, ast::Type::Primitive(ast::PrimitiveType::Int)));
+        assert!(matches!(
+            result,
+            ast::Type::Primitive(ast::PrimitiveType::Int)
+        ));
     }
 
     #[test]
@@ -2820,10 +2831,16 @@ mod tests {
     #[test]
     fn test_check_expr_set_type_alias() {
         let mut reg = TypeRegistry::new();
-        reg.register_alias("IntSet", ast::Type::Set(Box::new(ast::Type::Primitive(ast::PrimitiveType::Int))));
+        reg.register_alias(
+            "IntSet",
+            ast::Type::Set(Box::new(ast::Type::Primitive(ast::PrimitiveType::Int))),
+        );
         let resolved = reg.resolve_type(&ast::Type::Primitive(ast::PrimitiveType::Node));
         // Resolving Node type should return the default
-        assert!(matches!(resolved, ast::Type::Primitive(ast::PrimitiveType::Node)));
+        assert!(matches!(
+            resolved,
+            ast::Type::Primitive(ast::PrimitiveType::Node)
+        ));
     }
 
     #[test]
@@ -2951,7 +2968,10 @@ mod tests {
             CondValue::Bool(true)
         );
         assert_eq!(
-            ConditionEvaluator::eval_expr_to_value(&ctx, &Expr::Lit(Literal::StringVal("hi".into()))),
+            ConditionEvaluator::eval_expr_to_value(
+                &ctx,
+                &Expr::Lit(Literal::StringVal("hi".into()))
+            ),
             CondValue::StringVal("hi".into())
         );
     }
@@ -3029,16 +3049,28 @@ mod tests {
 
     #[test]
     fn test_cond_value_is_string() {
-        assert_eq!(CondValue::StringVal("test".into()).as_string(), Some("test".to_string()));
+        assert_eq!(
+            CondValue::StringVal("test".into()).as_string(),
+            Some("test".to_string())
+        );
         assert_eq!(CondValue::Int(42).as_string(), None);
         assert_eq!(CondValue::Null.as_string(), None);
     }
 
     #[test]
     fn test_cond_value_resource_string() {
-        assert_eq!(CondValue::Resource("node1".into()).as_string(), Some("node1".to_string()));
-        assert_eq!(CondValue::Node("node1".into()).as_string(), Some("node1".to_string()));
-        assert_eq!(CondValue::Role("admin".into()).as_string(), Some("admin".to_string()));
+        assert_eq!(
+            CondValue::Resource("node1".into()).as_string(),
+            Some("node1".to_string())
+        );
+        assert_eq!(
+            CondValue::Node("node1".into()).as_string(),
+            Some("node1".to_string())
+        );
+        assert_eq!(
+            CondValue::Role("admin".into()).as_string(),
+            Some("admin".to_string())
+        );
     }
 
     #[test]

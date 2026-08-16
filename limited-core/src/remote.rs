@@ -1,6 +1,6 @@
-use std::sync::{Arc, Mutex};
-use crate::resource::RuntimeValue;
 use crate::ast::SecretSource;
+use crate::resource::RuntimeValue;
+use std::sync::{Arc, Mutex};
 
 /// Errors that can occur during remote operations.
 #[derive(Debug, Clone)]
@@ -23,8 +23,15 @@ impl std::fmt::Display for RemoteError {
         match self {
             RemoteError::HostUnknown(host) => write!(f, "host unknown: {host}"),
             RemoteError::Transport(err) => write!(f, "transport failure: {err}"),
-            RemoteError::CommandFailed { command, exit_code, stderr } => {
-                write!(f, "command '{command}' failed with exit code {exit_code}: {stderr}")
+            RemoteError::CommandFailed {
+                command,
+                exit_code,
+                stderr,
+            } => {
+                write!(
+                    f,
+                    "command '{command}' failed with exit code {exit_code}: {stderr}"
+                )
             }
             RemoteError::PathNotFound(path) => write!(f, "path not found: {path}"),
             RemoteError::ParseError(err) => write!(f, "parse error: {err}"),
@@ -37,12 +44,7 @@ impl std::fmt::Display for RemoteError {
 impl std::error::Error for RemoteError {}
 
 pub trait RemoteTransport: Send + Sync {
-    fn exec(
-        &self,
-        machine: &str,
-        cmd: &str,
-        args: &[String],
-    ) -> Result<String, RemoteError>;
+    fn exec(&self, machine: &str, cmd: &str, args: &[String]) -> Result<String, RemoteError>;
 
     /// Run `cmd` in an interactive PTY session (SSH-style TUI passthrough).
     ///
@@ -58,25 +60,11 @@ pub trait RemoteTransport: Send + Sync {
         )))
     }
 
-    fn transfer(
-        &self,
-        machine: &str,
-        src: &str,
-        dst: &str,
-    ) -> Result<(), RemoteError>;
+    fn transfer(&self, machine: &str, src: &str, dst: &str) -> Result<(), RemoteError>;
 
-    fn pull(
-        &self,
-        machine: &str,
-        src: &str,
-        dst: &str,
-    ) -> Result<(), RemoteError>;
+    fn pull(&self, machine: &str, src: &str, dst: &str) -> Result<(), RemoteError>;
 
-    fn shell(
-        &self,
-        machine: &str,
-        script: &str,
-    ) -> Result<String, RemoteError>;
+    fn shell(&self, machine: &str, script: &str) -> Result<String, RemoteError>;
 
     fn remote_write(
         &self,
@@ -85,18 +73,9 @@ pub trait RemoteTransport: Send + Sync {
         path: &str,
     ) -> Result<(), RemoteError>;
 
-    fn remote_read(
-        &self,
-        machine: &str,
-        path: &str,
-    ) -> Result<RuntimeValue, RemoteError>;
+    fn remote_read(&self, machine: &str, path: &str) -> Result<RuntimeValue, RemoteError>;
 
-    fn set_env(
-        &self,
-        machine: &str,
-        name: &str,
-        source: &SecretSource,
-    ) -> Result<(), RemoteError>;
+    fn set_env(&self, machine: &str, name: &str, source: &SecretSource) -> Result<(), RemoteError>;
 }
 
 pub struct NoopTransport;
@@ -127,7 +106,12 @@ impl RemoteTransport for NoopTransport {
         Ok(String::new())
     }
 
-    fn remote_write(&self, _machine: &str, _value: &RuntimeValue, _path: &str) -> Result<(), RemoteError> {
+    fn remote_write(
+        &self,
+        _machine: &str,
+        _value: &RuntimeValue,
+        _path: &str,
+    ) -> Result<(), RemoteError> {
         Ok(())
     }
 
@@ -135,21 +119,56 @@ impl RemoteTransport for NoopTransport {
         Ok(RuntimeValue::Struct(std::collections::HashMap::new()))
     }
 
-    fn set_env(&self, _machine: &str, _name: &str, _source: &SecretSource) -> Result<(), RemoteError> {
+    fn set_env(
+        &self,
+        _machine: &str,
+        _name: &str,
+        _source: &SecretSource,
+    ) -> Result<(), RemoteError> {
         Ok(())
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum RecordedCall {
-    Exec { machine: String, cmd: String, args: Vec<String> },
-    ExecInteractive { machine: String, cmd: String, args: Vec<String> },
-    Transfer { machine: String, src: String, dst: String },
-    Pull { machine: String, src: String, dst: String },
-    Shell { machine: String, script: String },
-    RemoteWrite { machine: String, value: RuntimeValue, path: String },
-    RemoteRead { machine: String, path: String },
-    SetEnv { machine: String, name: String, source: SecretSource },
+    Exec {
+        machine: String,
+        cmd: String,
+        args: Vec<String>,
+    },
+    ExecInteractive {
+        machine: String,
+        cmd: String,
+        args: Vec<String>,
+    },
+    Transfer {
+        machine: String,
+        src: String,
+        dst: String,
+    },
+    Pull {
+        machine: String,
+        src: String,
+        dst: String,
+    },
+    Shell {
+        machine: String,
+        script: String,
+    },
+    RemoteWrite {
+        machine: String,
+        value: RuntimeValue,
+        path: String,
+    },
+    RemoteRead {
+        machine: String,
+        path: String,
+    },
+    SetEnv {
+        machine: String,
+        name: String,
+        source: SecretSource,
+    },
 }
 
 #[derive(Default, Clone)]
@@ -185,11 +204,14 @@ impl RemoteTransport for TestTransport {
         cmd: &str,
         args: &[String],
     ) -> Result<(), RemoteError> {
-        self.calls.lock().unwrap().push(RecordedCall::ExecInteractive {
-            machine: machine.to_string(),
-            cmd: cmd.to_string(),
-            args: args.to_vec(),
-        });
+        self.calls
+            .lock()
+            .unwrap()
+            .push(RecordedCall::ExecInteractive {
+                machine: machine.to_string(),
+                cmd: cmd.to_string(),
+                args: args.to_vec(),
+            });
         Ok(())
     }
 
@@ -219,7 +241,12 @@ impl RemoteTransport for TestTransport {
         Ok(String::new())
     }
 
-    fn remote_write(&self, machine: &str, value: &RuntimeValue, path: &str) -> Result<(), RemoteError> {
+    fn remote_write(
+        &self,
+        machine: &str,
+        value: &RuntimeValue,
+        path: &str,
+    ) -> Result<(), RemoteError> {
         self.calls.lock().unwrap().push(RecordedCall::RemoteWrite {
             machine: machine.to_string(),
             value: value.clone(),

@@ -1189,7 +1189,7 @@ impl Parser {
                             let s = s.clone();
                             self.pos += 1;
                             s
-                        },
+                        }
                         _ => String::new(),
                     }
                 };
@@ -1286,7 +1286,10 @@ impl Parser {
             stmt
         } else {
             Err(ParseError {
-                message: format!("unexpected token {:?} in operation statement", self.cur().kind),
+                message: format!(
+                    "unexpected token {:?} in operation statement",
+                    self.cur().kind
+                ),
                 pos: self.pos,
             })
         }
@@ -1356,7 +1359,9 @@ impl Parser {
             }
             TokenKind::Kw(kw) => {
                 self.pos += 1;
-                ast::Ident { name: kw.to_string() }
+                ast::Ident {
+                    name: kw.to_string(),
+                }
             }
             _ => {
                 return Err(ParseError {
@@ -2653,7 +2658,6 @@ mod tests {
     use super::*;
     use crate::ast::expr::{Expr, Literal};
     use crate::ast::{CostConstraint, Item, SumOp};
-    use crate::pretty;
 
     fn assert_parse(source: &str) -> ast::Program {
         parse(source).expect("failed to parse")
@@ -3469,7 +3473,8 @@ mod tests {
         if program.items.is_empty() && program.statements.is_empty() {
             return;
         }
-        let reprogram = parse(&pretty).expect(&format!("failed to parse pretty-printed: '{}'", pretty));
+        let reprogram = parse(&pretty)
+            .unwrap_or_else(|_| panic!("failed to parse pretty-printed: '{}'", pretty));
         assert_eq!(
             program.items.len(),
             reprogram.items.len(),
@@ -3539,14 +3544,15 @@ mod tests {
 
     #[test]
     fn roundtrip_role_with_define_ops() {
-        assert_roundtrip("role Admin { up: Root, can define operation for Musashi, down, Musashi.down }");
+        assert_roundtrip(
+            "role Admin { up: Root, can define operation for Musashi, down, Musashi.down }",
+        );
     }
 
     #[test]
     fn roundtrip_resource_with_field() {
         assert_roundtrip("resource File { capacity: Bytes, field path: String }");
     }
-
 
     #[test]
     fn roundtrip_machine_simple() {
@@ -3630,7 +3636,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn roundtrip_try_catch_error() {
         assert_roundtrip("try { tasks { foo } } catch error e { tasks { bar } }");
@@ -3643,7 +3648,9 @@ mod tests {
 
     #[test]
     fn roundtrip_try_catch_finally() {
-        assert_roundtrip("try { tasks { foo } } catch error e { tasks { bar } } finally { tasks { baz } }");
+        assert_roundtrip(
+            "try { tasks { foo } } catch error e { tasks { bar } } finally { tasks { baz } }",
+        );
     }
 
     #[test]
@@ -3842,7 +3849,9 @@ mod tests {
     fn test_parse_choose_expr() {
         // choose in task block
         let result = parse("tasks { choose m from all_machines }");
-        if let Err(ref e) = result { eprintln!("CHOOSE ERROR: {e}"); }
+        if let Err(ref e) = result {
+            eprintln!("CHOOSE ERROR: {e}");
+        }
         assert!(result.is_ok());
     }
 
@@ -4099,7 +4108,6 @@ mod tests {
         let result = parse("tasks { \"hello world\" }");
         assert!(result.is_ok());
     }
-
 
     #[test]
     fn test_parse_role_basic() {

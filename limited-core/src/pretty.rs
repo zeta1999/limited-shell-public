@@ -72,7 +72,7 @@ fn role_pretty(r: &ast::RoleDecl) -> String {
             target_pretty(target)
         ));
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -138,7 +138,7 @@ fn resource_pretty(r: &ast::ResourceDecl) -> String {
         }
         s.push('\n');
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -156,7 +156,7 @@ fn device_pretty(d: &ast::DeviceDecl) -> String {
     for rule in &d.cost_rules {
         s.push_str(&cost_rule_pretty(rule));
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -245,7 +245,7 @@ fn machine_pretty(m: &ast::MachineDecl) -> String {
     for dev in &m.devices {
         s.push_str(&format!("  device {} type {}\n", dev.name, dev.device_type));
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -274,7 +274,7 @@ fn operation_pretty(o: &ast::OperationDecl) -> String {
         s.push_str(&cost_entries_pretty(&cost.costs, 2));
         s.push_str("  },\n");
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -385,7 +385,7 @@ fn function_pretty(f: &ast::FunctionDecl) -> String {
             ast::FailAction::Otherwise => s.push_str("  failure otherwise\n"),
         }
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -630,7 +630,11 @@ fn if_pretty(i: &ast::IfStmt) -> String {
 fn try_catch_pretty(t: &ast::TryCatch) -> String {
     let mut s = format!("try {{ {} }}", stmts_pretty(&t.body));
     if let Some(err_var) = &t.catch_err_var {
-        s.push_str(&format!(" catch error {} {{ {} }}", err_var, stmts_pretty(&t.catch_body)));
+        s.push_str(&format!(
+            " catch error {} {{ {} }}",
+            err_var,
+            stmts_pretty(&t.catch_body)
+        ));
     } else if !t.catch_body.is_empty() {
         s.push_str(&format!(" catch {{ {} }}", stmts_pretty(&t.catch_body)));
     }
@@ -649,7 +653,7 @@ fn stmts_pretty(stmts: &[ast::Statement]) -> String {
 fn cond_pretty(c: &ast::Condition) -> String {
     c.predicates
         .iter()
-        .map(|p| cond_pred_pretty(p))
+        .map(cond_pred_pretty)
         .collect::<Vec<_>>()
         .join(" and ")
 }
@@ -662,7 +666,7 @@ fn cond_pred_pretty(p: &ast::ConditionPred) -> String {
                 expr_pretty(left),
                 roles
                     .iter()
-                    .map(|r| role_ref_pretty(r))
+                    .map(role_ref_pretty)
                     .collect::<Vec<_>>()
                     .join(" or ")
             )
@@ -1058,7 +1062,9 @@ mod tests {
 
     #[test]
     fn test_pretty_print_list_type() {
-        let t = type_pretty(&ast::Type::List(Box::new(ast::Type::Primitive(ast::PrimitiveType::JSON))));
+        let t = type_pretty(&ast::Type::List(Box::new(ast::Type::Primitive(
+            ast::PrimitiveType::JSON,
+        ))));
         assert_eq!(t, "[JSON]");
     }
 
@@ -1088,7 +1094,9 @@ mod tests {
 
     #[test]
     fn test_pretty_print_machines_set() {
-        let result = machines_pretty(&ast::Machines::Set(Ident { name: "my_set".into() }));
+        let result = machines_pretty(&ast::Machines::Set(Ident {
+            name: "my_set".into(),
+        }));
         assert_eq!(result, "machine set my_set");
     }
 
@@ -1141,7 +1149,7 @@ mod tests {
     fn test_pretty_print_condition_not() {
         let cond = ast::Condition {
             predicates: vec![ast::ConditionPred::Not(Box::new(
-                ast::ConditionPred::Exists(Box::new(var("x")))
+                ast::ConditionPred::Exists(Box::new(var("x"))),
             ))],
         };
         let result = cond_pretty(&cond);
@@ -1199,7 +1207,9 @@ mod tests {
         let cond = ast::Condition {
             predicates: vec![ast::ConditionPred::Is {
                 left: var("role"),
-                roles: vec![ast::RoleRef::Exact(Ident { name: "web_admin".into() })],
+                roles: vec![ast::RoleRef::Exact(Ident {
+                    name: "web_admin".into(),
+                })],
             }],
         };
         let result = cond_pretty(&cond);
@@ -1252,14 +1262,25 @@ mod tests {
 
     #[test]
     fn test_pretty_print_role_ref() {
-        assert_eq!(role_ref_pretty(&ast::RoleRef::Exact(Ident { name: "web".into() })), "web");
-        assert_eq!(role_ref_pretty(&ast::RoleRef::Down(Ident { name: "web".into() })), "web down");
-        assert_eq!(role_ref_pretty(&ast::RoleRef::RoleDown(Ident { name: "web".into() })), "web.down");
+        assert_eq!(
+            role_ref_pretty(&ast::RoleRef::Exact(Ident { name: "web".into() })),
+            "web"
+        );
+        assert_eq!(
+            role_ref_pretty(&ast::RoleRef::Down(Ident { name: "web".into() })),
+            "web down"
+        );
+        assert_eq!(
+            role_ref_pretty(&ast::RoleRef::RoleDown(Ident { name: "web".into() })),
+            "web.down"
+        );
     }
 
     #[test]
     fn test_pretty_print_secret_source_env() {
-        let src = ast::SecretSource::Env(Ident { name: "DB_URL".into() });
+        let src = ast::SecretSource::Env(Ident {
+            name: "DB_URL".into(),
+        });
         let result = secret_source_pretty(&src);
         assert!(result.contains("env"));
         assert!(result.contains("DB_URL"));

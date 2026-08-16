@@ -740,7 +740,9 @@ mod tests {
 
     #[test]
     fn test_ident_display() {
-        let id = Ident { name: "my_var".into() };
+        let id = Ident {
+            name: "my_var".into(),
+        };
         assert_eq!(format!("{}", id), "my_var");
     }
 
@@ -762,7 +764,6 @@ mod tests {
         assert_eq!(format!("{}", PrimitiveType::JSON), "JSON");
     }
 
-
     #[test]
     fn test_alias_kind_clone() {
         let kind = AliasKind::Machine;
@@ -783,13 +784,18 @@ mod tests {
 
     #[test]
     fn test_define_ops_target_clone() {
-        let target = DefineOpsTarget::Role(Ident { name: "admin".into() });
+        let target = DefineOpsTarget::Role(Ident {
+            name: "admin".into(),
+        });
         let _cloned = target.clone();
     }
 
     #[test]
     fn test_machine_extent_ram() {
-        let ram = MachineExtent::RAM(BytesLit { value: 1024, suffix: BytesSuffix::KiB });
+        let ram = MachineExtent::RAM(BytesLit {
+            value: 1024,
+            suffix: BytesSuffix::KiB,
+        });
         match ram {
             MachineExtent::RAM(b) => assert_eq!(format!("{}", b), "1024KiB"),
             _ => panic!("expected RAM"),
@@ -799,8 +805,12 @@ mod tests {
     #[test]
     fn test_cost_constraint_sum_lt() {
         let constraint = CostConstraint::SumLt {
-            extent: Ident { name: "disk".into() },
-            pool: Expr::Var(Ident { name: "max_disk".into() }),
+            extent: Ident {
+                name: "disk".into(),
+            },
+            pool: Expr::Var(Ident {
+                name: "max_disk".into(),
+            }),
         };
         assert!(matches!(constraint, CostConstraint::SumLt { .. }));
     }
@@ -810,8 +820,12 @@ mod tests {
         let constraint = CostConstraint::SumOpLt {
             op: SumOp::Plus,
             left_extent: Ident { name: "cpu".into() },
-            right_extent: Ident { name: "memory".into() },
-            pool: Expr::Var(Ident { name: "total".into() }),
+            right_extent: Ident {
+                name: "memory".into(),
+            },
+            pool: Expr::Var(Ident {
+                name: "total".into(),
+            }),
         };
         assert!(matches!(constraint, CostConstraint::SumOpLt { op, .. } if op == SumOp::Plus));
     }
@@ -853,7 +867,13 @@ mod tests {
             left: Box::new(Expr::Lit(Literal::Int(1))),
             right: Box::new(Expr::Lit(Literal::Int(2))),
         };
-        assert!(matches!(expr, Expr::BinOp { op: BinOp::Plus, .. }));
+        assert!(matches!(
+            expr,
+            Expr::BinOp {
+                op: BinOp::Plus,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -878,7 +898,9 @@ mod tests {
     fn test_expr_call() {
         let expr = Expr::Call {
             func: Ident { name: "len".into() },
-            args: vec![Expr::Var(Ident { name: "items".into() })],
+            args: vec![Expr::Var(Ident {
+                name: "items".into(),
+            })],
         };
         assert!(matches!(expr, Expr::Call { func, .. } if func.name == "len"));
     }
@@ -886,8 +908,12 @@ mod tests {
     #[test]
     fn test_expr_field_access() {
         let expr = Expr::FieldAccess {
-            target: Box::new(Expr::Var(Ident { name: "machine".into() })),
-            field: Ident { name: "name".into() },
+            target: Box::new(Expr::Var(Ident {
+                name: "machine".into(),
+            })),
+            field: Ident {
+                name: "name".into(),
+            },
         };
         assert!(matches!(expr, Expr::FieldAccess { field, .. } if field.name == "name"));
     }
@@ -895,7 +921,9 @@ mod tests {
     #[test]
     fn test_expr_index_access() {
         let expr = Expr::IndexAccess {
-            target: Box::new(Expr::Var(Ident { name: "items".into() })),
+            target: Box::new(Expr::Var(Ident {
+                name: "items".into(),
+            })),
             index: Box::new(Expr::Lit(Literal::Int(0))),
         };
         assert!(matches!(expr, Expr::IndexAccess { .. }));
@@ -904,9 +932,12 @@ mod tests {
     #[test]
     fn test_expr_struct() {
         let expr = Expr::Struct {
-            fields: vec![
-                (Ident { name: "name".into() }, Box::new(Expr::Lit(Literal::StringVal("test".into())))),
-            ],
+            fields: vec![(
+                Ident {
+                    name: "name".into(),
+                },
+                Box::new(Expr::Lit(Literal::StringVal("test".into()))),
+            )],
         };
         assert!(matches!(expr, Expr::Struct { fields } if fields.len() == 1));
     }
@@ -915,7 +946,9 @@ mod tests {
     fn test_expr_choose() {
         let expr = Expr::Choose {
             variable: Ident { name: "m".into() },
-            ty: Type::Resource(Ident { name: "Machine".into() }),
+            ty: Type::Resource(Ident {
+                name: "Machine".into(),
+            }),
             from_set: None,
         };
         assert!(matches!(expr, Expr::Choose { variable, .. } if variable.name == "m"));
@@ -946,7 +979,9 @@ mod tests {
     #[test]
     fn test_type_list() {
         let t = Type::List(Box::new(Type::Primitive(PrimitiveType::JSON)));
-        assert!(matches!(t, Type::List(inner) if matches!(*inner, Type::Primitive(PrimitiveType::JSON))));
+        assert!(
+            matches!(t, Type::List(inner) if matches!(*inner, Type::Primitive(PrimitiveType::JSON)))
+        );
     }
 
     #[test]
@@ -993,16 +1028,54 @@ mod tests {
 
     #[test]
     fn test_type_resource() {
-        let t = Type::Resource(Ident { name: "Server".into() });
+        let t = Type::Resource(Ident {
+            name: "Server".into(),
+        });
         assert!(matches!(t, Type::Resource(name) if name.name == "Server"));
     }
 
     #[test]
     fn test_bytes_lit_display_all() {
-        assert_eq!(format!("{}", BytesLit { value: 1024, suffix: BytesSuffix::KiB }), "1024KiB");
-        assert_eq!(format!("{}", BytesLit { value: 500, suffix: BytesSuffix::None }), "500");
-        assert_eq!(format!("{}", BytesLit { value: 256, suffix: BytesSuffix::MB }), "256MB");
-        assert_eq!(format!("{}", BytesLit { value: 1, suffix: BytesSuffix::GiB }), "1GiB");
+        assert_eq!(
+            format!(
+                "{}",
+                BytesLit {
+                    value: 1024,
+                    suffix: BytesSuffix::KiB
+                }
+            ),
+            "1024KiB"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                BytesLit {
+                    value: 500,
+                    suffix: BytesSuffix::None
+                }
+            ),
+            "500"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                BytesLit {
+                    value: 256,
+                    suffix: BytesSuffix::MB
+                }
+            ),
+            "256MB"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                BytesLit {
+                    value: 1,
+                    suffix: BytesSuffix::GiB
+                }
+            ),
+            "1GiB"
+        );
     }
 
     #[test]

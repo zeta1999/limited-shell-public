@@ -791,6 +791,7 @@ mod tests {
     use super::*;
     use crate::ast::expr::{Expr, Literal};
 
+    #[allow(dead_code)]
     fn int_lit(n: i64) -> Expr {
         Expr::Lit(Literal::Int(n))
     }
@@ -799,6 +800,7 @@ mod tests {
         ast::BytesLit { value, suffix }
     }
 
+    #[allow(dead_code)]
     fn bytes_expr(value: u64) -> Expr {
         Expr::Lit(Literal::Bytes(bytes_lit(value, ast::BytesSuffix::None)))
     }
@@ -854,7 +856,7 @@ mod tests {
     #[test]
     fn test_resource_registry_set_field() {
         let mut reg = ResourceRegistry::new();
-        let mut instance = ResourceInstance::new("file1", "File");
+        let instance = ResourceInstance::new("file1", "File");
         reg.register(instance);
 
         reg.set_field("file1", "path", string_val("/new/path"))
@@ -1273,10 +1275,7 @@ mod tests {
         assert_eq!(str_val.as_string(), Some("hello"));
         assert_eq!(str_val.as_int(), None);
 
-        let res_val = RuntimeValue::Resource(
-            "Node".to_string(),
-            HashMap::new(),
-        );
+        let res_val = RuntimeValue::Resource("Node".to_string(), HashMap::new());
         assert_eq!(res_val.resource_type(), Some("Node"));
         assert_eq!(res_val.as_bool(), None);
     }
@@ -1287,19 +1286,13 @@ mod tests {
         assert_eq!(RuntimeValue::Bool(true).type_name(), "Bool");
         assert_eq!(RuntimeValue::Int(42).type_name(), "Int");
         assert_eq!(RuntimeValue::Bytes(1024).type_name(), "Bytes");
-        assert_eq!(
-            RuntimeValue::StringVal("x".into()).type_name(),
-            "String"
-        );
+        assert_eq!(RuntimeValue::StringVal("x".into()).type_name(), "String");
         assert_eq!(
             RuntimeValue::Resource("Node".into(), HashMap::new()).type_name(),
             "Resource"
         );
         assert_eq!(RuntimeValue::List(vec![]).type_name(), "List");
-        assert_eq!(
-            RuntimeValue::Struct(HashMap::new()).type_name(),
-            "Struct"
-        );
+        assert_eq!(RuntimeValue::Struct(HashMap::new()).type_name(), "Struct");
     }
 
     #[test]
@@ -1326,7 +1319,10 @@ mod tests {
     #[test]
     fn test_machine_device_new() {
         let mut extents = HashMap::new();
-        extents.insert("CPU".to_string(), ExtentPool::new("CPU", 4, ExtentType::Count));
+        extents.insert(
+            "CPU".to_string(),
+            ExtentPool::new("CPU", 4, ExtentType::Count),
+        );
         let device = Device {
             name: "gpu0".to_string(),
             extents,
@@ -1366,7 +1362,10 @@ mod tests {
     #[test]
     fn test_machine_registry_create_set() {
         let mut registry = MachineRegistry::new();
-        registry.create_set("prod", HashSet::from(["alpha".to_string(), "beta".to_string()]));
+        registry.create_set(
+            "prod",
+            HashSet::from(["alpha".to_string(), "beta".to_string()]),
+        );
         let members = registry.get_set_members("prod").unwrap();
         assert_eq!(members.len(), 2);
         assert!(members.contains(&"alpha".to_string()));
@@ -1383,7 +1382,10 @@ mod tests {
     #[test]
     fn test_machine_device_rates() {
         let mut extents = HashMap::new();
-        extents.insert("CPU".to_string(), ExtentPool::new("CPU", 4, ExtentType::Count));
+        extents.insert(
+            "CPU".to_string(),
+            ExtentPool::new("CPU", 4, ExtentType::Count),
+        );
         let mut rates = HashMap::new();
         rates.insert("CPU".to_string(), 1_500_000_000u64);
         let device = Device {
@@ -1399,7 +1401,10 @@ mod tests {
     fn test_extent_engine_add_device() {
         let mut engine = ExtentEngine::new();
         let mut extents = HashMap::new();
-        extents.insert("GPU".to_string(), ExtentPool::new("GPU", 2, ExtentType::Count));
+        extents.insert(
+            "GPU".to_string(),
+            ExtentPool::new("GPU", 2, ExtentType::Count),
+        );
         engine.add_device(Device {
             name: "gpu0".to_string(),
             extents,
@@ -1415,7 +1420,10 @@ mod tests {
     fn test_extent_engine_inheritance_resolve() {
         let mut engine = ExtentEngine::new();
         let mut parent_extents = HashMap::new();
-        parent_extents.insert("CPU".to_string(), ExtentPool::new("CPU", 8, ExtentType::Count));
+        parent_extents.insert(
+            "CPU".to_string(),
+            ExtentPool::new("CPU", 8, ExtentType::Count),
+        );
         engine.add_device(Device {
             name: "parent".to_string(),
             extents: parent_extents,
@@ -1446,8 +1454,14 @@ mod tests {
     fn test_extent_engine_device_extent_names() {
         let mut engine = ExtentEngine::new();
         let mut extents = HashMap::new();
-        extents.insert("CPU".to_string(), ExtentPool::new("CPU", 4, ExtentType::Count));
-        extents.insert("RAM".to_string(), ExtentPool::new("RAM", 16, ExtentType::Bytes));
+        extents.insert(
+            "CPU".to_string(),
+            ExtentPool::new("CPU", 4, ExtentType::Count),
+        );
+        extents.insert(
+            "RAM".to_string(),
+            ExtentPool::new("RAM", 16, ExtentType::Bytes),
+        );
         engine.add_device(Device {
             name: "gpu0".to_string(),
             extents,

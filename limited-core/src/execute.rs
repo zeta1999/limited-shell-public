@@ -83,11 +83,7 @@ impl<'a> ExecutionContext<'a> {
         self.scopes
             .first()
             .into_iter()
-            .flat_map(|scope| {
-                scope.iter().filter_map(|(k, v)| {
-                    Some((k.clone(), v.to_string()))
-                })
-            })
+            .flat_map(|scope| scope.iter().map(|(k, v)| (k.clone(), v.to_string())))
             .collect()
     }
 
@@ -317,11 +313,7 @@ pub fn lit_to_runtime(lit: &Literal) -> RuntimeValue {
 fn normalize_index(idx: i64, len: usize) -> usize {
     if idx < 0 {
         let abs = (-idx) as usize;
-        if abs <= len {
-            len - abs
-        } else {
-            0
-        }
+        len.saturating_sub(abs)
     } else {
         idx as usize % len
     }
@@ -476,7 +468,10 @@ fn eval_builtin_call(
         "machines" => {
             let names = ctx.machine_registry().list();
             Ok(RuntimeValue::List(
-                names.iter().map(|n| RuntimeValue::StringVal(n.to_string())).collect(),
+                names
+                    .iter()
+                    .map(|n| RuntimeValue::StringVal(n.to_string()))
+                    .collect(),
             ))
         }
         "len" => match &args[0] {
@@ -632,7 +627,7 @@ fn execute_control_flow(
                             ctx.bind(err_var.name.clone(), RuntimeValue::StringVal(e.to_string()));
                         }
                         let catch_result = execute_body(&tc.catch_body, ctx);
-                        if let Some(_) = &tc.catch_err_var {
+                        if tc.catch_err_var.is_some() {
                             ctx.pop_scope();
                         }
                         // Always run finally
@@ -966,7 +961,8 @@ pub fn execute_op_statement(
             let from_val = eval_expr(from, ctx)?;
             let from_str = match &from_val {
                 RuntimeValue::StringVal(s) => s.clone(),
-                RuntimeValue::Resource(_, fields) => fields.get("location")
+                RuntimeValue::Resource(_, fields) => fields
+                    .get("location")
                     .or_else(|| fields.get("path"))
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| from_val.to_string()),
@@ -976,7 +972,8 @@ pub fn execute_op_statement(
             let machine_val = eval_expr(machine, ctx)?;
             let target_machine = match &machine_val {
                 RuntimeValue::StringVal(s) => s.clone(),
-                RuntimeValue::Resource(_, fields) => fields.get("name")
+                RuntimeValue::Resource(_, fields) => fields
+                    .get("name")
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| machine_val.to_string()),
                 _ => machine_val.to_string(),
@@ -1086,7 +1083,8 @@ pub fn execute_function(
         ast::FunctionStatement::ReadJson { var } => {
             let target = ctx.get_machine().unwrap_or("local");
             let path = format!("/tmp/{}.json", var.name);
-            let value = ctx.remote
+            let value = ctx
+                .remote
                 .remote_read(target, &path)
                 .map_err(ExecutionError::Remote)?;
             ctx.bind(var.name.clone(), value);
@@ -1109,7 +1107,8 @@ pub fn execute_function(
             let from_val = eval_expr(from, ctx)?;
             let from_str = match &from_val {
                 RuntimeValue::StringVal(s) => s.clone(),
-                RuntimeValue::Resource(_, fields) => fields.get("location")
+                RuntimeValue::Resource(_, fields) => fields
+                    .get("location")
                     .or_else(|| fields.get("path"))
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| from_val.to_string()),
@@ -1119,7 +1118,8 @@ pub fn execute_function(
             let machine_val = eval_expr(machine, ctx)?;
             let target_machine = match &machine_val {
                 RuntimeValue::StringVal(s) => s.clone(),
-                RuntimeValue::Resource(_, fields) => fields.get("name")
+                RuntimeValue::Resource(_, fields) => fields
+                    .get("name")
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| machine_val.to_string()),
                 _ => machine_val.to_string(),
@@ -1244,8 +1244,7 @@ fn eval_condition_pred(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resource::{ExtentEngine, MachineRegistry, MachineSet, ResourceRegistry};
-    use std::collections::HashSet;
+    use crate::resource::{ExtentEngine, MachineRegistry, ResourceRegistry};
 
     fn make_ctx() -> ExecutionContext<'static> {
         let reg = Box::leak(Box::new(ResourceRegistry::new()));
@@ -2138,9 +2137,12 @@ mod tests {
     fn test_execute_struct_expr() {
         let ctx = make_ctx();
         let struct_expr = ast::expr::Expr::Struct {
-            fields: vec![
-                (ast::Ident { name: "name".into() }, Box::new(ast::expr::Expr::Lit(Literal::StringVal("test".into())))),
-            ],
+            fields: vec![(
+                ast::Ident {
+                    name: "name".into(),
+                },
+                Box::new(ast::expr::Expr::Lit(Literal::StringVal("test".into()))),
+            )],
         };
         let result = eval_expr(&struct_expr, &ctx).unwrap();
         assert!(matches!(result, RuntimeValue::Struct(_)));
@@ -2163,10 +2165,16 @@ mod tests {
         let mut ctx = make_ctx();
         // Top-level on machine statement with a task block body
         let on_stmt = ast::Statement::OnMachine(ast::OnMachineStmt {
-            machines: ast::Machines::Single(ast::Ident { name: "alpha".into() }),
+            machines: ast::Machines::Single(ast::Ident {
+                name: "alpha".into(),
+            }),
             body: Some(Box::new(ast::TaskBlock {
-                machines: ast::Machines::Inline(vec![ast::Ident { name: "alpha".into() }]),
-                body: vec![ast::TaskItem::ExprTask(Box::new(Expr::Lit(Literal::Int(42))))],
+                machines: ast::Machines::Inline(vec![ast::Ident {
+                    name: "alpha".into(),
+                }]),
+                body: vec![ast::TaskItem::ExprTask(Box::new(Expr::Lit(Literal::Int(
+                    42,
+                ))))],
             })),
         });
         assert!(execute_stmt(&on_stmt, &mut ctx).is_ok());
@@ -2181,7 +2189,9 @@ mod tests {
         let for_loop = ast::Statement::ControlFlow(ast::ControlFlow::For(ast::ForLoop::List {
             var: ast::Ident { name: "x".into() },
             iterable: Box::new(Expr::Call {
-                func: ast::Ident { name: "machines".into() },
+                func: ast::Ident {
+                    name: "machines".into(),
+                },
                 args: vec![],
             }),
             body: vec![],
@@ -2189,13 +2199,10 @@ mod tests {
         assert!(execute_stmt(&for_loop, &mut ctx).is_ok());
     }
 
-
     #[test]
     fn test_op_on_machine_set() {
         let mut ctx = make_ctx();
-        let on_machine = ast::OperationStatement::OnMachine(ast::Ident {
-            name: "set".into(),
-        });
+        let on_machine = ast::OperationStatement::OnMachine(ast::Ident { name: "set".into() });
         assert!(execute_op_statement(&on_machine, &mut ctx).is_ok());
     }
 
@@ -2233,7 +2240,9 @@ mod tests {
         let mut ctx = make_ctx();
         let stmt = ast::OperationStatement::ExecCommand {
             mode: ast::ExecMode::Batch,
-            cmd: ast::Ident { name: "deploy".into() },
+            cmd: ast::Ident {
+                name: "deploy".into(),
+            },
             args: vec![Expr::Lit(Literal::StringVal("app".into()))],
         };
         assert!(execute_op_statement(&stmt, &mut ctx).is_ok());
@@ -2277,8 +2286,12 @@ mod tests {
     fn test_execute_func_set_env() {
         let mut ctx = make_ctx();
         let stmt = ast::FunctionStatement::SetEnv {
-            name: ast::Ident { name: "API_KEY".into() },
-            secret: ast::SecretSource::Env(ast::Ident { name: "API_KEY".into() }),
+            name: ast::Ident {
+                name: "API_KEY".into(),
+            },
+            secret: ast::SecretSource::Env(ast::Ident {
+                name: "API_KEY".into(),
+            }),
         };
         let result = execute_function(&stmt, &mut ctx);
         assert!(result.is_ok());
@@ -2290,7 +2303,9 @@ mod tests {
         let mut ctx = make_ctx();
         ctx.bind("data".to_string(), RuntimeValue::Struct(HashMap::new()));
         let stmt = ast::FunctionStatement::WriteJson {
-            value: Expr::Var(ast::Ident { name: "data".into() }),
+            value: Expr::Var(ast::Ident {
+                name: "data".into(),
+            }),
         };
         let result = execute_function(&stmt, &mut ctx);
         assert!(result.is_ok());
@@ -2301,13 +2316,18 @@ mod tests {
     fn test_execute_func_read_json() {
         let mut ctx = make_ctx();
         let stmt = ast::FunctionStatement::ReadJson {
-            var: ast::Ident { name: "result".into() },
+            var: ast::Ident {
+                name: "result".into(),
+            },
         };
         let result = execute_function(&stmt, &mut ctx);
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
         // ReadJson binds an empty struct
-        assert!(matches!(ctx.lookup("result"), Some(RuntimeValue::Struct(_))));
+        assert!(matches!(
+            ctx.lookup("result"),
+            Some(RuntimeValue::Struct(_))
+        ));
     }
 
     #[test]
@@ -2315,18 +2335,25 @@ mod tests {
         let mut ctx = make_ctx();
         ctx.bind("running".to_string(), RuntimeValue::Bool(true));
         let if_stmt = ast::IfStmt {
-            condition: Box::new(Expr::Var(ast::Ident { name: "running".into() })),
+            condition: Box::new(Expr::Var(ast::Ident {
+                name: "running".into(),
+            })),
             then_body: vec![ast::Statement::TaskBlock(ast::TaskBlock {
                 machines: ast::Machines::Single(ast::Ident { name: "_".into() }),
                 body: vec![ast::TaskItem::OpCallArgs {
-                    op: ast::Ident { name: "check".into() },
+                    op: ast::Ident {
+                        name: "check".into(),
+                    },
                     args: vec![],
                 }],
             })],
             else_if: vec![],
             else_body: vec![],
         };
-        let result = execute_stmt(&ast::Statement::ControlFlow(ast::ControlFlow::If(if_stmt)), &mut ctx);
+        let result = execute_stmt(
+            &ast::Statement::ControlFlow(ast::ControlFlow::If(if_stmt)),
+            &mut ctx,
+        );
         assert!(result.is_ok());
     }
 
@@ -2362,7 +2389,9 @@ mod tests {
             can_tell: ast::Ident { name: "_".into() },
             condition: Box::new(Expr::BinOp {
                 op: BinOp::Lt,
-                left: Box::new(Expr::Var(ast::Ident { name: "count".into() })),
+                left: Box::new(Expr::Var(ast::Ident {
+                    name: "count".into(),
+                })),
                 right: Box::new(Expr::Lit(Literal::Int(0))),
             }),
             tell_func: ast::Ident { name: "_".into() },
@@ -2372,7 +2401,10 @@ mod tests {
                 body: vec![],
             })],
         };
-        let result = execute_stmt(&ast::Statement::ControlFlow(ast::ControlFlow::While(while_loop)), &mut ctx);
+        let result = execute_stmt(
+            &ast::Statement::ControlFlow(ast::ControlFlow::While(while_loop)),
+            &mut ctx,
+        );
         assert!(result.is_ok());
     }
 
@@ -2429,7 +2461,9 @@ mod tests {
         let mut ctx = make_ctx();
         let stmt = ast::OperationStatement::ExecCommand {
             mode: ast::ExecMode::Batch,
-            cmd: ast::Ident { name: "test".into() },
+            cmd: ast::Ident {
+                name: "test".into(),
+            },
             args: vec![Expr::Lit(Literal::StringVal("arg1".into()))],
         };
         assert!(execute_op_statement(&stmt, &mut ctx).is_ok());
@@ -2441,7 +2475,9 @@ mod tests {
         let stmt = ast::FunctionStatement::Dependency {
             service_name: ast::Ident { name: "web".into() },
             service_param: None,
-            on_machine: ast::Ident { name: "primary".into() },
+            on_machine: ast::Ident {
+                name: "primary".into(),
+            },
             as_name: ast::Ident { name: "w".into() },
         };
         let result = execute_function(&stmt, &mut ctx);
@@ -2455,7 +2491,9 @@ mod tests {
         ctx.bind("target".to_string(), RuntimeValue::StringVal("host".into()));
         let stmt = ast::FunctionStatement::Transfer {
             from: Expr::Lit(Literal::StringVal("/src".into())),
-            machine: Expr::Var(ast::Ident { name: "target".into() }),
+            machine: Expr::Var(ast::Ident {
+                name: "target".into(),
+            }),
             location: Expr::Lit(Literal::StringVal("/dst".into())),
         };
         let result = execute_function(&stmt, &mut ctx);
@@ -2469,7 +2507,9 @@ mod tests {
         let stmt = ast::FunctionStatement::Dependency {
             service_name: ast::Ident { name: "web".into() },
             service_param: None,
-            on_machine: ast::Ident { name: "host".into() },
+            on_machine: ast::Ident {
+                name: "host".into(),
+            },
             as_name: ast::Ident { name: "dep".into() },
         };
         let result = execute_function(&stmt, &mut ctx);
@@ -2497,10 +2537,7 @@ mod tests {
     #[test]
     fn test_execute_for_loop_dict_empty() {
         let mut ctx = make_ctx();
-        ctx.bind(
-            "m".to_string(),
-            RuntimeValue::Struct(HashMap::new()),
-        );
+        ctx.bind("m".to_string(), RuntimeValue::Struct(HashMap::new()));
         let for_loop = ast::ControlFlow::For(ast::ForLoop::Dict {
             key_var: ast::Ident { name: "k".into() },
             value_var: ast::Ident { name: "v".into() },
@@ -2599,7 +2636,10 @@ mod tests {
             index: Box::new(Expr::Lit(Literal::Int(0))),
         };
         let result = eval_expr(&expr, &ctx);
-        assert!(matches!(result, Err(ExecutionError::IndexTypeMismatch(_, _))));
+        assert!(matches!(
+            result,
+            Err(ExecutionError::IndexTypeMismatch(_, _))
+        ));
     }
 
     #[test]
@@ -2610,11 +2650,16 @@ mod tests {
             RuntimeValue::List(vec![RuntimeValue::Int(1), RuntimeValue::Int(2)]),
         );
         let expr = Expr::IndexAccess {
-            target: Box::new(Expr::Var(ast::Ident { name: "items".into() })),
+            target: Box::new(Expr::Var(ast::Ident {
+                name: "items".into(),
+            })),
             index: Box::new(Expr::Lit(Literal::StringVal("key".into()))),
         };
         let result = eval_expr(&expr, &ctx);
-        assert!(matches!(result, Err(ExecutionError::IndexTypeMismatch(_, _))));
+        assert!(matches!(
+            result,
+            Err(ExecutionError::IndexTypeMismatch(_, _))
+        ));
     }
 
     #[test]
@@ -2639,8 +2684,18 @@ mod tests {
         let ctx = make_ctx();
         let expr = Expr::Struct {
             fields: vec![
-                (ast::Ident { name: "name".into() }, Box::new(Expr::Lit(Literal::StringVal("test".into())))),
-                (ast::Ident { name: "count".into() }, Box::new(Expr::Lit(Literal::Int(3)))),
+                (
+                    ast::Ident {
+                        name: "name".into(),
+                    },
+                    Box::new(Expr::Lit(Literal::StringVal("test".into()))),
+                ),
+                (
+                    ast::Ident {
+                        name: "count".into(),
+                    },
+                    Box::new(Expr::Lit(Literal::Int(3))),
+                ),
             ],
         };
         let result = eval_expr(&expr, &ctx);
@@ -2653,7 +2708,9 @@ mod tests {
         // Choose is only valid inside operation body - will error outside
         let expr = Expr::Choose {
             variable: ast::Ident { name: "m".into() },
-            ty: ast::Type::Resource(ast::Ident { name: "Machine".into() }),
+            ty: ast::Type::Resource(ast::Ident {
+                name: "Machine".into(),
+            }),
             from_set: None,
         };
         let result = eval_expr(&expr, &ctx);
@@ -2664,7 +2721,9 @@ mod tests {
     fn test_exec_call_builtin() {
         let ctx = make_ctx();
         let expr = Expr::Call {
-            func: ast::Ident { name: "range".into() },
+            func: ast::Ident {
+                name: "range".into(),
+            },
             args: vec![Expr::Lit(Literal::Int(1)), Expr::Lit(Literal::Int(5))],
         };
         let result = eval_expr(&expr, &ctx);
@@ -2675,7 +2734,9 @@ mod tests {
     fn test_exec_call_no_args() {
         let ctx = make_ctx();
         let expr = Expr::Call {
-            func: ast::Ident { name: "range".into() },
+            func: ast::Ident {
+                name: "range".into(),
+            },
             args: vec![],
         };
         let result = eval_expr(&expr, &ctx);
@@ -2686,7 +2747,9 @@ mod tests {
     fn test_exec_call_wrong_type_arg() {
         let ctx = make_ctx();
         let expr = Expr::Call {
-            func: ast::Ident { name: "range".into() },
+            func: ast::Ident {
+                name: "range".into(),
+            },
             args: vec![Expr::Lit(Literal::StringVal("bad".into()))],
         };
         let result = eval_expr(&expr, &ctx);
@@ -2700,7 +2763,9 @@ mod tests {
         map.insert("key".to_string(), RuntimeValue::Int(42));
         ctx.bind("data".to_string(), RuntimeValue::Struct(map));
         let expr = Expr::IndexAccess {
-            target: Box::new(Expr::Var(ast::Ident { name: "data".into() })),
+            target: Box::new(Expr::Var(ast::Ident {
+                name: "data".into(),
+            })),
             index: Box::new(Expr::Lit(Literal::StringVal("key".into()))),
         };
         let result = eval_expr(&expr, &ctx);
@@ -2712,7 +2777,9 @@ mod tests {
         let mut ctx = make_ctx();
         ctx.bind("data".to_string(), RuntimeValue::Struct(HashMap::new()));
         let expr = Expr::IndexAccess {
-            target: Box::new(Expr::Var(ast::Ident { name: "data".into() })),
+            target: Box::new(Expr::Var(ast::Ident {
+                name: "data".into(),
+            })),
             index: Box::new(Expr::Lit(Literal::StringVal("missing".into()))),
         };
         let result = eval_expr(&expr, &ctx);
@@ -2737,9 +2804,14 @@ mod tests {
     fn test_exec_index_negative() {
         // Negative index is handled as negative offset - may or may not error
         let mut ctx = make_ctx();
-        ctx.bind("items".to_string(), RuntimeValue::List(vec![RuntimeValue::Int(1)]));
+        ctx.bind(
+            "items".to_string(),
+            RuntimeValue::List(vec![RuntimeValue::Int(1)]),
+        );
         let expr = Expr::IndexAccess {
-            target: Box::new(Expr::Var(ast::Ident { name: "items".into() })),
+            target: Box::new(Expr::Var(ast::Ident {
+                name: "items".into(),
+            })),
             index: Box::new(Expr::Lit(Literal::Int(-1))),
         };
         let result = eval_expr(&expr, &ctx);
@@ -2749,9 +2821,14 @@ mod tests {
     #[test]
     fn test_exec_index_out_of_bounds() {
         let mut ctx = make_ctx();
-        ctx.bind("items".to_string(), RuntimeValue::List(vec![RuntimeValue::Int(1)]));
+        ctx.bind(
+            "items".to_string(),
+            RuntimeValue::List(vec![RuntimeValue::Int(1)]),
+        );
         let expr = Expr::IndexAccess {
-            target: Box::new(Expr::Var(ast::Ident { name: "items".into() })),
+            target: Box::new(Expr::Var(ast::Ident {
+                name: "items".into(),
+            })),
             index: Box::new(Expr::Lit(Literal::Int(5))),
         };
         let result = eval_expr(&expr, &ctx);
@@ -2764,7 +2841,9 @@ mod tests {
         let ctx = make_ctx();
         let expr = Expr::FieldAccess {
             target: Box::new(Expr::Lit(Literal::Int(42))),
-            field: ast::Ident { name: "missing".into() },
+            field: ast::Ident {
+                name: "missing".into(),
+            },
         };
         let result = eval_expr(&expr, &ctx);
         assert!(result.is_err());
@@ -2776,7 +2855,9 @@ mod tests {
         ctx.bind("empty".to_string(), RuntimeValue::List(vec![]));
         let expr = Expr::Call {
             func: ast::Ident { name: "len".into() },
-            args: vec![Expr::Var(ast::Ident { name: "empty".into() })],
+            args: vec![Expr::Var(ast::Ident {
+                name: "empty".into(),
+            })],
         };
         let result = eval_expr(&expr, &ctx);
         assert!(result.is_ok());
@@ -2787,7 +2868,9 @@ mod tests {
     fn test_exec_exists_true() {
         let ctx = make_ctx();
         let expr = Expr::Call {
-            func: ast::Ident { name: "exists".into() },
+            func: ast::Ident {
+                name: "exists".into(),
+            },
             args: vec![Expr::Lit(Literal::StringVal("test".into()))],
         };
         let result = eval_expr(&expr, &ctx);
@@ -2799,7 +2882,9 @@ mod tests {
     fn test_exec_to_int() {
         let ctx = make_ctx();
         let expr = Expr::Call {
-            func: ast::Ident { name: "to_int".into() },
+            func: ast::Ident {
+                name: "to_int".into(),
+            },
             args: vec![Expr::Lit(Literal::StringVal("42".into()))],
         };
         let result = eval_expr(&expr, &ctx);
@@ -2819,9 +2904,10 @@ mod tests {
     fn test_exec_struct_literal() {
         let ctx = make_ctx();
         let expr = Expr::Struct {
-            fields: vec![
-                (ast::Ident { name: "x".into() }, Box::new(Expr::Lit(Literal::Int(1)))),
-            ],
+            fields: vec![(
+                ast::Ident { name: "x".into() },
+                Box::new(Expr::Lit(Literal::Int(1))),
+            )],
         };
         let result = eval_expr(&expr, &ctx);
         assert!(result.is_ok());
